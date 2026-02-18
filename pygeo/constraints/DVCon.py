@@ -27,6 +27,7 @@ from .thicknessConstraint import (
     ProximityConstraint,
     ThicknessConstraint,
     ThicknessToChordConstraint,
+    CamberConstraint,
 )
 from .volumeConstraint import CompositeVolumeConstraint, TriangulatedVolumeConstraint, VolumeConstraint
 
@@ -1628,6 +1629,99 @@ class DVConstraints:
             conName = name
 
         self.constraints[typeName][conName] = ThicknessToChordConstraint(
+            conName,
+            thicknessCoords,
+            LeTeCoords,
+            lower,
+            upper,
+            scaled,
+            scale,
+            self.DVGeometries[DVGeoName],
+            addToPyOpt,
+            compNames,
+            sectionMax,
+            ksRho,
+        )
+        return self.constraints[typeName][conName]
+
+    def addCamberConstraints2D(
+        self,
+        leList,
+        teList,
+        nSpan,
+        nChord,
+        lower=1.0,
+        upper=3.0,
+        scaled=True,
+        scale=1.0,
+        name=None,
+        addToPyOpt=True,
+        surfaceName="default",
+        DVGeoName="default",
+        compNames=None,
+        sectionMax=False,
+        ksRho=50.0,
+    ):
+        """Similar to addThicknessConstraints2D except that the values computed are thickness-to-chord ratios.
+
+        The chord lengths are computed based on the leading and trailing edge points provided by the user.
+
+        Parameters
+        ----------
+        leList :
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        teList :
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        nSpan :
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        nChord :
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        lower : float, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        upper : float, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        scaled : bool, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        scale : float, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        name : str, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        addToPyOpt : bool, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        surfaceName : str, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        DVGeoName : str, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        compNames : list, optional
+            See :meth:`addThicknessConstraints2D <.DVConstraints.addThicknessConstraints2D>`
+        sectionMax : bool, optional
+            If True, the output values are the maximum thickness-to-chord ratio in each section, computed using KS
+            aggregation.
+        ksRho : float, optional
+            The rho value to use for KS aggregation if ``sectionMax=True``
+        """
+
+        self._checkDVGeo(DVGeoName)
+
+        if nChord < 2:
+            raise Error("nChord must be at least 2")
+
+        thicknessCoords = self._generateGridIntersections(leList, teList, nSpan, nChord, surfaceName)
+
+        # Create leading and trailing edge points at the midpoint of the forward and rearmost thickness points
+        LeTeCoords = np.zeros((nSpan, 2, 3))
+        for ii in [0, -1]:
+            LeTeCoords[:, ii, :] = 0.5 * (thicknessCoords[:, ii, 0, :] + thicknessCoords[:, ii, 1, :])
+
+        typeName = "thickCon"
+        if typeName not in self.constraints:
+            self.constraints[typeName] = OrderedDict()
+        if name is None:
+            conName = f"{self.name}_thickness_to_chord_constraints_{len(self.constraints[typeName])}"
+        else:
+            conName = name
+
+        self.constraints[typeName][conName] = CamberConstraint(
             conName,
             thicknessCoords,
             LeTeCoords,

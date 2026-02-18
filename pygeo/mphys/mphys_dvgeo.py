@@ -1053,6 +1053,22 @@ class OM_DVGEOCOMP(om.ExplicitComponent):
         lSize = len(indSetA)
         self.add_output(name, distributed=False, val=np.zeros(lSize), shape=lSize)
 
+    def nom_addCamberConstraints2D(self, name, leList, teList, nSpan, nChord, **kwargs):
+        """
+        Add a DVCon thickness to chord constraint to the problem
+        Wrapper for :meth:`addThicknessToChordConstraints2D <.DVConstraints.addThicknessToChordConstraints2D>`
+        Input parameters are identical to those in wrapped function unless otherwise specified
+        """
+        con = self.DVCon.addCamberConstraints2D(
+            leList,
+            teList,
+            nSpan,
+            nChord,
+            name=name,
+            **kwargs,
+        )
+        self.add_output(name, distributed=False, val=np.ones(con.nCon), shape=con.nCon)
+
     def nom_addTriangulatedSurfaceConstraint(
         self,
         name,
