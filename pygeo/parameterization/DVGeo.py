@@ -12,6 +12,7 @@ from pyspline import Curve
 from pyspline.utils import closeTecplot, openTecplot, writeTecplot1D, writeTecplot3D
 from scipy import sparse
 from scipy.spatial import cKDTree
+from stl import mesh
 
 # Local modules
 from .. import geo_utils, pyBlock, pyNetwork
@@ -4913,3 +4914,101 @@ class DVGeometry(BaseDVGeometry):
                     self.coefRotM[coef] = np.eye(3)
 
         return nSections
+
+    def writeMorphedSTL(self, filename, ptSetName):
+        """
+        Write the current morphed surface geometry to an STL file.
+
+        This method retrieves the updated point set coordinates from the
+        DVGeometry object and writes them to an STL file using the
+        numpy-stl package.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the output STL file (e.g., 'morphed_output.stl')
+        ptSetName : str
+            Name of the point set to write. This should be a point set
+            that was previously added via addPointSet().
+
+        Raises
+        ------
+        KeyError
+            If the ptSetName is not found in the DVGeometry object.
+        ValueError
+            If the number of points is not divisible by 3 (i.e., not
+            a valid triangulated surface).
+        ImportError
+            If the numpy-stl package is not installed.
+
+        Examples
+        --------
+        >>> from pygeo import DVGeometry
+        >>> from stl import mesh
+        >>> import numpy as np
+        >>>
+        >>> # Load an STL file
+        >>> base_mesh = mesh.Mesh.from_file('baseline.stl')
+        >>>
+        >>> # Extract vertices from the STL mesh
+        >>> # Each triangle has 3 vertices with 3 coordinates
+        >>> points = base_mesh.vectors.reshape(-1, 3)
+        >>>
+        >>> # Create DVGeometry from FFD file
+        >>> dvGeo = DVGeometry('ffd_box.xyz')
+        >>>
+        >>> # Add the STL points as a point set
+        >>> dvGeo.addPointSet(points, 'stl_surface')
+        >>>
+        >>> # Add design variables
+        >>> dvGeo.addLocalDV('shape', lower=-0.5, upper=0.5, axis='y')
+        >>>
+        >>> # Set new design variable values
+        >>> dvs = dvGeo.getValues()
+        >>> dvs['shape'] = np.ones_like(dvs['shape']) * 0.1
+        >>> dvGeo.setDesignVars(dvs)
+        >>>
+        >>> # Write morphed STL
+        >>> dvGeo.writeMorphedSTL('morphed.stl', 'stl_surface')
+        """
+
+        # Check that the point set exists
+        if ptSetName not in self.updated:
+            raise KeyError(
+                f"Point set '{ptSetName}' not found in DVGeometry. "
+                f"Available point sets: {list(self.updated.keys())}"
+            )
+
+        # Get the updated (morphed) coordinates
+        morphed_coords = self.update(ptSetName)
+
+        # Verify that the number of points is divisible by 3
+        num_points = morphed_coords.shape[0]
+        if num_points % 3 != 0:
+            raise ValueError(
+                f"Number of points ({num_points}) is not divisible by 3. "
+                "The point set does not appear to be a valid triangulated "
+                "surface. Each triangle requires exactly 3 vertices."
+            )
+
+        # Reshape into triangles: (num_triangles, 3_vertices, 3_coords)
+        num_triangles = num_points // 3
+        triangles = morphed_coords.reshape(num_triangles, 3, 3)
+
+        # Create the numpy-stl mesh object
+        stl_mesh = mesh.Mesh(
+            np.zeros(num_triangles, dtype=mesh.Mesh.dtype)
+        )
+
+        # Assign triangle vertices
+        stl_mesh.vectors = triangles
+
+        # Calculate face normals
+        stl_mesh.update_normals()
+
+        # Save to file
+        stl_mesh.save(filename)
+
+        print(f"Wrote morphed STL: {filename}")
+        print(f"  Triangles: {num_triangles}")
+        print(f"  Vertices:  {num_points}")
