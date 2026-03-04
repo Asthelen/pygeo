@@ -5012,3 +5012,59 @@ class DVGeometry(BaseDVGeometry):
         print(f"Wrote morphed STL: {filename}")
         print(f"  Triangles: {num_triangles}")
         print(f"  Vertices:  {num_points}")
+
+    def writeMorphedFFD(self, filename):
+        """
+        Write the current (deformed) FFD control points to a Plot3D file.
+
+        This reads the current state of the FFD coef array from the
+        DVGeometry object and writes it in Plot3D multiblock format,
+        which is the same format pyGeo reads FFD files in.
+
+        Parameters
+        ----------
+        filename : str
+            Output filename (e.g., 'final_ffd.xyz')
+        """
+        # The FFD control points are stored in self.FFD.coef
+        # This array is updated when setDesignVars() is called.
+        coef = self.FFD.coef
+
+        # Get the FFD volume dimensions
+        # FFD.vols is a list of Volume objects, each with dimensions lu, lv, lw
+        vols = self.FFD.vols
+
+        with open(filename, 'w') as f:
+            # Number of blocks
+            nBlocks = len(vols)
+            f.write(f"{nBlocks}\n")
+
+            # Write dimensions for each block
+            for vol in vols:
+                nU = vol.nCtlu
+                nV = vol.nCtlv
+                nW = vol.nCtlw
+                f.write(f"{nU} {nV} {nW}\n")
+
+            # Write coordinates for each block
+            for vol in vols:
+                nU = vol.nCtlu
+                nV = vol.nCtlv
+                nW = vol.nCtlw
+
+                # Get the control point indices for this volume
+                # The coef array is shared across all volumes
+                coefLocal = vol.coef
+
+                # Write x, y, z coordinates separately (Plot3D format)
+                for dim in range(3):
+                    for k in range(nW):
+                        for j in range(nV):
+                            for i in range(nU):
+                                f.write(f"{coefLocal[i, j, k, dim]:.15e} ")
+                            f.write("\n")
+
+        print(f"Wrote FFD file: {filename}")
+        print(f"  Blocks: {nBlocks}")
+        for i, vol in enumerate(vols):
+            print(f"  Block {i}: {vol.nCtlu} x {vol.nCtlv} x {vol.nCtlw}")
