@@ -990,6 +990,7 @@ class OM_DVGEOCOMP(om.ExplicitComponent):
         surfaceName="default",
         DVGeoName="default",
         compNames=None,
+        chordwiseOffset=None,
     ):
         self.DVCon.addLERadiusConstraints(
             leList=leList,
@@ -1002,6 +1003,7 @@ class OM_DVGEOCOMP(om.ExplicitComponent):
             surfaceName=surfaceName,
             DVGeoName=DVGeoName,
             compNames=compNames,
+            chordwiseOffset=chordwiseOffset,
         )
         self.add_output(name, distributed=False, val=np.ones(nSpan), shape=nSpan)
 

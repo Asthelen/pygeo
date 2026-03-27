@@ -1003,6 +1003,7 @@ class DVConstraints:
         surfaceName="default",
         DVGeoName="default",
         compNames=None,
+        chordwiseOffset=None,
     ):
         r"""
         Add a set of leading edge radius constraints. The constraint is set up
@@ -1116,15 +1117,34 @@ class DVConstraints:
             with this constraint should be added.
             If None, the point set is added to all components.
 
+        chordwiseOffset : float, optional
+            First projects leList to the leading edge, then offsets the polyline by
+            this amount. This allows leList to be further offset from the leading
+            edge without sacrificing accuracy of the LERadius computation.
+
         """
         self._checkDVGeo(DVGeoName)
+
+        if chordwiseOffset is not None:
+            # project the given leList to the leading edge, then offset by the specified amount
+            X = leList.copy()
+            chordDir = np.array(chordDir, dtype="d").flatten()
+            chordDir /= np.linalg.norm(chordDir)
+            leList_projected, _ = self._projectToSurface(surfaceName, X, chordDir)
+            leList_projected -= chordDir*chordwiseOffset
 
         # determine the seed points for the constraint
         if nSpan == -1:
             nSpan = len(leList)
-            X = leList.copy()
+            if chordwiseOffset is not None:
+                X = leList_projected
+            else:
+                X = leList.copy()
         else:
-            constr_line = Curve(X=leList, k=2)
+            if chordwiseOffset is not None:
+                constr_line = Curve(X=leList_projected, k=2)
+            else:
+                constr_line = Curve(X=leList, k=2)
             s = np.linspace(0, 1, nSpan)
             X = constr_line(s)
         coords = np.zeros((nSpan, 3, 3))
